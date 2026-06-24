@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Real-Time Threat Intel Log Stream</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #0f172a; 
+            color: #f8fafc; 
+            padding: 30px; 
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        h2 { 
+            color: #38bdf8; 
+            border-bottom: 2px solid #334155; 
+            padding-bottom: 10px; 
+            flex: 1;
+        }
+        .status { 
+            padding: 8px 16px; 
+            border-radius: 4px; 
+            font-size: 12px; 
+            font-weight: bold; 
+            margin-left: 20px;
+        }
+        .status.connected { 
+            background-color: #22c55e; 
+            color: #0f172a; 
+        }
+        .status.disconnected { 
+            background-color: #ef4444; 
+            color: #fff; 
+        }
+        .status.connecting { 
+            background-color: #f59e0b; 
+            color: #0f172a; 
+        }
+        #log-container { 
+            background-color: #1e293b; 
+            padding: 20px; 
+            border-radius: 8px; 
+            height: 500px; 
+            overflow-y: auto; 
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); 
+            font-family: monospace; 
+            font-size: 13px;
+            border: 1px solid #334155;
+        }
+        .log-row { 
+            padding: 10px; 
+            margin-bottom: 8px; 
+            border-radius: 4px; 
+            border-left: 5px solid #64748b; 
+            background-color: #1e293b; 
+            animation: fadeIn 0.3s ease; 
+            word-wrap: break-word;
+        }
+        .log-row.error { 
+            border-left-color: #ef4444; 
+            background-color: #7f1d1d; 
+            color: #fca5a5; 
+        }
+        .log-row.warning { 
+            border-left-color: #f59e0b; 
+            background-color: #78350f; 
+            color: #fcd34d; 
+        }
+        .log-row.info { 
+            border-left-color: #3b82f6; 
+            background-color: #1e3a8a; 
+            color: #93c5fd; 
+        }
+        .log-row.anomaly { 
+            border-left-color: #ec4899; 
+            background-color: #831843; 
+            color: #f472b6; 
+            font-weight: bold;
+        }
+        .timestamp { color: #94a3b8; margin-right: 5px; }
+        .service { color: #fbbf24; font-style: italic; margin-right: 5px; }
+        .risk-score { color: #a78bfa; font-size: 11px; font-weight: bold; }
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(-5px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>🛡️ AI Real-Time System Log Monitor</h2>
+        <div class="status connecting" id="status">CONNECTING...</div>
+    </div>
+    <p>Live database connection streaming active via WebSockets...</p>
+    
+    <div id="log-container">
+        <div class="log-row info"><strong>[INFO]</strong> System started successfully. Waiting for live logs from MySQL...</div>
+    </div>
+
+    <script>
+        const logSocket = new WebSocket('ws://' + window.location.host + '/ws/logs/');
+        const statusEl = document.getElementById('status');
+        const container = document.getElementById('log-container');
+
+        function addLog(severity, message, data = {}) {
+            const row = document.createElement('div');
+            
+            let logClass = 'log-row';
+            if (data.is_anomaly === true || data.is_anomaly === 'true') {
+                logClass += ' anomaly';
+            } else if (severity === 'ERROR' || severity === 'CRITICAL') {
+                logClass += ' error';
+            } else if (severity === 'WARNING') {
+                logClass += ' warning';
+            } else {
+                logClass += ' info';
+            }
+            
+            row.className = logClass;
+            
+            const timestamp = data.timestamp ? `<span class="timestamp">[${data.timestamp}]</span>` : '';
+            const service = data.service_name ? `<span class="service">${data.service_name}</span>` : '';
+            
+            let riskScore = '';
+            if (data.ai_risk_score !== undefined && data.ai_risk_score !== null) {
+                const score = parseFloat(data.ai_risk_score);
+                riskScore = `<span class="risk-score"> | AI Risk: ${score.toFixed(2)}</span>`;
+            }
+            
+            row.innerHTML = `<strong>[${severity}]</strong> ${timestamp} ${service} ${message} ${riskScore}`;
+            container.prepend(row);
+            
+            while (container.children.length > 100) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        logSocket.onopen = function(e) {
+            statusEl.textContent = 'CONNECTED';
+            statusEl.className = 'status connected';
+            addLog('INFO', 'WebSocket connection established successfully');
+        };
+
+        logSocket.onmessage = function(e) {
+            try {
+                const receivedData = JSON.parse(e.data);
+                const logData = receivedData.data ? receivedData.data : receivedData;
+                const severity = logData.severity || 'INFO';
+                const message = logData.log_message || 'No message content';
+                addLog(severity, message, logData);
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+
+        logSocket.onerror = function(error) {
+            statusEl.textContent = 'ERROR';
+            statusEl.className = 'status disconnected';
+        };
+
+        logSocket.onclose = function(e) {
+            statusEl.textContent = 'DISCONNECTED';
+            statusEl.className = 'status disconnected';
+        };
+    </script>
+</body>
+</html>
