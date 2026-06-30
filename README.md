@@ -28,9 +28,4 @@ The frontend UI is designed to seamlessly integrate with this backend.
 *   **WebSocket Connection:** Upon loading, the UI establishes a WebSocket connection to the Daphne server to listen for live updates.
 *   **Dynamic Rendering:** As the UI receives JSON payloads from the backend stream, it dynamically updates charts, tables, or log viewers without requiring a page refresh.
 
-## 🛠️ Setup and Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone <your-repo-url>
-   cd flux-market-backend
